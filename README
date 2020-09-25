@@ -1,0 +1,147 @@
+Raspberry Pi Zero W using Buildroot and U-Boot
+==============================================
+
+U-Boot
+------
+
+Build as a standalone (can be build using buildroot)
+
+	export CROSS_COMPILE=arm-none-eabi-
+	export ARCH=arm
+	make rpi_0_w_defconfig 
+	make -j8 -s
+
+In the rpi boot partition, add the file u-boot.bin and change config.txt to 
+load u-boot instead of the Linux kernel
+
+	kernel=u-boot.bin
+
+In u-boot promptn load kernel, passe bootargs params and boot at kernel address
+using preloaded device tree. We also set the system as read only to avoid 
+SD card corruption over time.
+
+	mmc dev 0
+	fatload mmc 0:1 ${kernel_addr_r} zImage
+	setenv earlyprintk bootargs root=/dev/mmcblk0p2 rootfstype=ext4 \
+		ro rootwait console=ttyAMA0,115200
+	printenv
+	md ${fdt_addr}
+	bootz ${kernel_addr_r} - ${fdt_addr}
+
+To avoid writing it each time, it is store in boot.scr. This command will 
+create a script to be copied into the SD boot partition
+
+	mkimage -A arm -O linux -T script -C none -n boot.scr -d boot.scr boot.scr.uimg
+
+The device tree blob is loaded by the first stage bootloader in fdt_addr.
+This should also be possible to be loaded from the U-Boot stage like this
+
+	fatload mmc 0:1 ${fdt_addr} bcm2708-rpi-zero-w.dtb
+	
+but it seems the first stage rpi bootloader does some modification to the dtb 
+before loading it, and a "raw" loaded dtb doesn't seem to work.
+
+References
+
+	[https://elinux.org/RPi_U-Boot]
+	[https://pranavlavhate761157457.wordpress.com/2018/05/14/porting-of-u-boot-on-raspberrypi-3/]
+	[https://www.raspberrypi.org/forums/viewtopic.php?t=276146]
+
+
+Buildroot
+---------
+
+Retrieve buildroot
+
+	git clone https://github.com/buildroot/buildroot.git
+
+Show available configuration
+
+	make list-defconfigs
+	
+Use our own saved defconfig
+
+	cp raspberrypi0w_defconfig buildroot/configs/raspberrypi0w_defconfig
+
+Use rpi zero default configuration as base
+
+	make raspberrypi0w_defconfig
+
+Modify the default configuration (for example to add packages)
+
+	make menuconfig
+	
+Modidy the kernel configuration (we set up printk and early printk in kernel
+hacking menu)
+	
+	make linux-menuconfig
+	
+In the same manner, if needed
+
+	make busybox-menuconfig
+	make uboot-menuconfig
+	
+Settings changed 
+
+	Bootloaders -> U-Boot (or build as a standalone, see previous section)
+	Kernel hacking log level (TODO: to be REFOUND)
+
+Build
+
+	make all
+
+Burn the image to SD card
+
+	sudo dd if=output/images/sdcard.img of=/dev/mmcblk0 bs=1M status=progress
+	
+Then copy our own rpi config.txt to the SD Card as well as output/images/u-boot.bin 
+
+Extract config file for git (do not store other package config such as busybox)
+	
+	make savedefconfig BR2_DEFCONFIG=../raspberrypi0w_defconfig
+
+References
+
+	[https://www.thirtythreeforty.net/posts/2020/01/mastering-embedded-linux-part-3-buildroot/]
+	[https://ltekieli.com/buildroot-with-raspberry-pi-u-boot/]
+	
+Serial communication
+--------------------
+
+To enable serial communication, add in config.txt 
+
+	enable_uart=1
+
+To monitor from Linux
+
+	sudo screen -L /dev/ttyUSB0 115200
+
+To be able to scroll up (switch to copy mode)
+
+	Ctrl + A, then Escape
+
+USB to TTL serial cable pinout
+
+	RED     5V   ---------------  5V   4   (or use USB power)
+	BLACK   GND  ---------------  GND  6
+	WHITE   RX   ---------------  TX   8
+	GREEN   TX   ---------------  RX   10
+
+References
+
+	[https://wSww.raspberrypi.org/documentation/configuration/uart.md]
+	[https://learn.adafruit.com/adafruits-raspberry-pi-lesson-5-using-a-console-cable/overview]
+
+
+Ideas and improvements
+----------------------
+- File bug 
+	- file creation possible, even in ro mode. 
+	- after hard reboot, file still present, but with gibberish or nothing inside.
+	- after soft reboot, file OK.
+- Fix UART bug : can't seems to have U-Boot log when using overlay disable-bt.
+- Tweak with device tree to gain understanding.
+- Add WiFi set up.
+- Use external tree for buildroot
+- Try an update mechanism through U-Boot.
+- Try to run a bare-metal application through U-Boot.

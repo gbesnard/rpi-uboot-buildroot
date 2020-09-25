@@ -1,0 +1,9 @@
+start_file=start.elf
+fixup_file=fixup.dat
+
+kernel=u-boot.bin
+# kernel=zImage
+
+gpu_mem=100
+
+enable_uart=1
