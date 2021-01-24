@@ -1,6 +1,7 @@
 Raspberry Pi Zero W using Buildroot and U-Boot
 ==============================================
 
+
 U-Boot
 ------
 
@@ -17,13 +18,12 @@ load u-boot instead of the Linux kernel
 	kernel=u-boot.bin
 
 In u-boot promptn load kernel, passe bootargs params and boot at kernel address
-using preloaded device tree. We also set the system as read only to avoid 
-SD card corruption over time.
+using preloaded device tree. Set the system as read/write.
 
 	mmc dev 0
 	fatload mmc 0:1 ${kernel_addr_r} zImage
 	setenv earlyprintk bootargs root=/dev/mmcblk0p2 rootfstype=ext4 \
-		ro rootwait console=ttyAMA0,115200
+		rw rootwait console=ttyAMA0,115200
 	printenv
 	md ${fdt_addr}
 	bootz ${kernel_addr_r} - ${fdt_addr}
@@ -84,7 +84,9 @@ In the same manner, if needed
 Settings changed 
 
 	Bootloaders -> U-Boot (or build as a standalone, see previous section)
-	Kernel hacking log level (TODO: to be REFOUND)
+	Hardware Handling -> Firmware -> rpi-wifi-firmware
+	Networking applications -> wpa_supplicant
+	Networking applications -> wpa_supplicant - Enable 80211 support
 
 Build
 
@@ -94,7 +96,8 @@ Burn the image to SD card
 
 	sudo dd if=output/images/sdcard.img of=/dev/mmcblk0 bs=1M status=progress
 	
-Then copy our own rpi config.txt to the SD Card as well as output/images/u-boot.bin 
+Then copy our own rpi config.txt to the SD Card as well as output/images/u-boot.bin
+and boot.scr.uimg 
 
 Extract config file for git (do not store other package config such as busybox)
 	
@@ -105,6 +108,46 @@ References
 	[https://www.thirtythreeforty.net/posts/2020/01/mastering-embedded-linux-part-3-buildroot/]
 	[https://ltekieli.com/buildroot-with-raspberry-pi-u-boot/]
 	
+
+Wifi
+----
+
+/etc/network/interfaces/etc/network/interfaces
+
+	auto wlan0
+	iface wlan0 inet dhcp
+		pre-up wpa_supplicant -D nl80211 -i wlan0 -c /etc/wpa_supplicant.conf -B
+		post-down killall -q wpa_supplicant
+
+/etc/wpa_supplicant.conf
+
+	ctrl_interface=/var/run/wpa_supplicant
+	ap_scan=1
+
+	network={
+		ssid="My WLAN"
+		psk="my_wlan_password"
+	}
+
+the wifi driver must be loaded before the networking init-scripts kick in
+edit /etc/inittab and modprobe brcmfmac ourselves before rs scripts are ran
+
+	# Load Wifi driver
+	::sysinit:/sbin/modprobe brcmfmac 
+
+	# now run any rc scripts
+	::sysinit:/etc/init.d/rcS
+
+Check if brcmfmac driver is loaded
+
+	lsmod
+
+References
+
+	[https://unix.stackexchange.com/questions/396151/buildroot-zero-w-wireless]
+	[https://armphibian.wordpress.com/2019/10/01/how-to-build-raspberry-pi-zero-w-buildroot-image/]
+
+
 Serial communication
 --------------------
 
@@ -135,13 +178,10 @@ References
 
 Ideas and improvements
 ----------------------
-- File bug 
-	- file creation possible, even in ro mode. 
-	- after hard reboot, file still present, but with gibberish or nothing inside.
-	- after soft reboot, file OK.
 - Fix UART bug : can't seems to have U-Boot log when using overlay disable-bt.
 - Tweak with device tree to gain understanding.
-- Add WiFi set up.
 - Use external tree for buildroot
 - Try an update mechanism through U-Boot.
 - Try to run a bare-metal application through U-Boot.
+- Maybe make linux-menuconfig not taken into account, check the error we get 
+when we try the command 
