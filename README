@@ -1,9 +1,135 @@
-Raspberry Pi Zero W using Buildroot and U-Boot
-==============================================
+Buildroot
+=========
+
+Commands
+--------
+
+Show available configuration
+
+	make list-defconfigs
+	
+Use rpi zero default configuration as base
+
+	make raspberrypi0w_defconfig
+
+Modify the default configuration (for example to add packages)
+
+	make menuconfig
+	
+Modidy the kernel configuration (we set up printk and early printk in kernel
+hacking menu)
+	
+	make linux-menuconfig
+	
+In the same manner, if needed
+
+	make busybox-menuconfig
+	make uboot-menuconfig
+	
+Settings changed 
+
+	Bootloaders -> U-Boot (or build as a standalone, see previous section)
+	
+Build
+
+	make all
+
+Burn the image to SD card
+
+	sudo dd if=output/images/sdcard.img of=/dev/mmcblk0 bs=1M status=progress
+	
+Then copy our own rpi config.txt to the SD Card as well as output/images/u-boot.bin
+and boot.scr.uimg 
+
+Extract config file for git (do not store other package config such as busybox)
+	
+	make savedefconfig BR2_DEFCONFIG=../raspberrypi0w_defconfig
+
+References
+
+	[https://www.thirtythreeforty.net/posts/2020/01/mastering-embedded-linux-part-3-buildroot/]
+	[https://ltekieli.com/buildroot-with-raspberry-pi-u-boot/]
+	
+
+WiFi
+----
+
+Buildroot modification needed to enable wifi
+
+	Hardware Handling -> Firmware -> rpi-wifi-firmware
+	Networking applications -> wpa_supplicant
+	Networking applications -> wpa_supplicant - Enable 80211 support
+
+Also modify /etc/network/interfaces/etc/network/interfaces with
+
+	auto wlan0
+	iface wlan0 inet dhcp
+		pre-up wpa_supplicant -D nl80211 -i wlan0 -c /etc/wpa_supplicant.conf -B
+		post-down killall -q wpa_supplicant
+
+and /etc/wpa_supplicant.conf with
+
+	ctrl_interface=/var/run/wpa_supplicant
+	ap_scan=1
+
+	network={
+		ssid="My WLAN"
+		psk="my_wlan_password"
+	}
+
+the wifi driver must be loaded before the networking init-scripts kick in
+edit /etc/inittab and modprobe brcmfmac ourselves before rs scripts are ran
+
+	# Load Wifi driver
+	::sysinit:/sbin/modprobe brcmfmac 
+
+	# now run any rc scripts
+	::sysinit:/etc/init.d/rcS
+
+Check if brcmfmac driver is loaded
+
+	lsmod
+
+References
+
+	[https://unix.stackexchange.com/questions/396151/buildroot-zero-w-wireless]
+	[https://armphibian.wordpress.com/2019/10/01/how-to-build-raspberry-pi-zero-w-buildroot-image/]
+
+
+Set up BR2 env
+--------------
+
+We use buildroot as a submodule (version tagged 2020.11.1)
+
+	git clone --recursive https://github.com/gbesnard/rpi-uboot-buildroot.git
+
+and our customization are stored in an external tree
+
+	make BR2_EXTERNAL=../khbx_brconfig list-defconfigs
+
+From now on, definitions from the khbx_brconfig external tree will be used.
+We can load our defconfig
+
+	make khbxrpi0w_defconfig
+
+and then build
+
+	make all
+
+save defconfig
+
+	make savedefconfig BR2_DEFCONFIG=../khbx_brconfig/khbxrpi0w_defconfig
+
+We also use buildroot overlay system, and post build and post image script to 
+automate our system generation.
+
+References
+
+	[https://buildroot.org/downloads/manual/manual.html#customize]
 
 
 U-Boot
-------
+======
 
 Build as a standalone (can be build using buildroot)
 
@@ -17,7 +143,7 @@ load u-boot instead of the Linux kernel
 
 	kernel=u-boot.bin
 
-In u-boot promptn load kernel, passe bootargs params and boot at kernel address
+In u-boot prompt load kernel, passe bootargs params and boot at kernel address
 using preloaded device tree. Set the system as read/write.
 
 	mmc dev 0
@@ -48,110 +174,10 @@ References
 	[https://www.raspberrypi.org/forums/viewtopic.php?t=276146]
 
 
-Buildroot
----------
-
-Retrieve buildroot
-
-	git clone https://github.com/buildroot/buildroot.git
-
-Show available configuration
-
-	make list-defconfigs
-	
-Use our own saved defconfig
-
-	cp raspberrypi0w_defconfig buildroot/configs/raspberrypi0w_defconfig
-
-Use rpi zero default configuration as base
-
-	make raspberrypi0w_defconfig
-
-Modify the default configuration (for example to add packages)
-
-	make menuconfig
-	
-Modidy the kernel configuration (we set up printk and early printk in kernel
-hacking menu)
-	
-	make linux-menuconfig
-	
-In the same manner, if needed
-
-	make busybox-menuconfig
-	make uboot-menuconfig
-	
-Settings changed 
-
-	Bootloaders -> U-Boot (or build as a standalone, see previous section)
-	Hardware Handling -> Firmware -> rpi-wifi-firmware
-	Networking applications -> wpa_supplicant
-	Networking applications -> wpa_supplicant - Enable 80211 support
-
-Build
-
-	make all
-
-Burn the image to SD card
-
-	sudo dd if=output/images/sdcard.img of=/dev/mmcblk0 bs=1M status=progress
-	
-Then copy our own rpi config.txt to the SD Card as well as output/images/u-boot.bin
-and boot.scr.uimg 
-
-Extract config file for git (do not store other package config such as busybox)
-	
-	make savedefconfig BR2_DEFCONFIG=../raspberrypi0w_defconfig
-
-References
-
-	[https://www.thirtythreeforty.net/posts/2020/01/mastering-embedded-linux-part-3-buildroot/]
-	[https://ltekieli.com/buildroot-with-raspberry-pi-u-boot/]
-	
-
-Wifi
-----
-
-/etc/network/interfaces/etc/network/interfaces
-
-	auto wlan0
-	iface wlan0 inet dhcp
-		pre-up wpa_supplicant -D nl80211 -i wlan0 -c /etc/wpa_supplicant.conf -B
-		post-down killall -q wpa_supplicant
-
-/etc/wpa_supplicant.conf
-
-	ctrl_interface=/var/run/wpa_supplicant
-	ap_scan=1
-
-	network={
-		ssid="My WLAN"
-		psk="my_wlan_password"
-	}
-
-the wifi driver must be loaded before the networking init-scripts kick in
-edit /etc/inittab and modprobe brcmfmac ourselves before rs scripts are ran
-
-	# Load Wifi driver
-	::sysinit:/sbin/modprobe brcmfmac 
-
-	# now run any rc scripts
-	::sysinit:/etc/init.d/rcS
-
-Check if brcmfmac driver is loaded
-
-	lsmod
-
-References
-
-	[https://unix.stackexchange.com/questions/396151/buildroot-zero-w-wireless]
-	[https://armphibian.wordpress.com/2019/10/01/how-to-build-raspberry-pi-zero-w-buildroot-image/]
-
-
 Serial communication
---------------------
+====================
 
-To enable serial communication, add in config.txt 
+To enable serial communication, add in rpi boot config.txt 
 
 	enable_uart=1
 
@@ -177,11 +203,9 @@ References
 
 
 Ideas and improvements
-----------------------
-- Fix UART bug : can't seems to have U-Boot log when using overlay disable-bt.
+======================
+
 - Tweak with device tree to gain understanding.
-- Use external tree for buildroot
+- Build a simple character device kernel module.
 - Try an update mechanism through U-Boot.
 - Try to run a bare-metal application through U-Boot.
-- Maybe make linux-menuconfig not taken into account, check the error we get 
-when we try the command 
