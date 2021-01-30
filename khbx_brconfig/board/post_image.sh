@@ -7,10 +7,10 @@ GENIMAGE_CFG="${BOARD_DIR}/genimage.cfg"
 GENIMAGE_TMP="${BUILD_DIR}/genimage.tmp"
 
 # Use our own version of config.txt 
-cp "${BR2_EXTERNAL_KHBX_BR2_TREE_PATH}/board/rpi-boot-config.txt" "${BINARIES_DIR}/rpi-firmware/config.txt" 
+cp "${BR2_EXTERNAL_KHBX_PATH}/board/rpi-boot-config.txt" "${BINARIES_DIR}/rpi-firmware/config.txt" 
 
 # Gen U-Boot script
-mkimage -A arm -O linux -T script -C none -n "${BR2_EXTERNAL_KHBX_BR2_TREE_PATH}/board/boot.scr" -d "${BR2_EXTERNAL_KHBX_BR2_TREE_PATH}/board/boot.scr" "${BINARIES_DIR}/boot.scr.uimg"
+mkimage -A arm -O linux -T script -C none -n "${BR2_EXTERNAL_KHBX_PATH}/board/boot.scr" -d "${BR2_EXTERNAL_KHBX_PATH}/board/boot.scr" "${BINARIES_DIR}/boot.scr.uimg"
 
 # Pass an empty rootpath. genimage makes a full copy of the given rootpath to
 # ${GENIMAGE_TMP}/root so passing TARGET_DIR would be a waste of time and disk

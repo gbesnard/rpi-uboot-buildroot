@@ -1,0 +1,4 @@
+config BR2_PACKAGE_FOOBAR_CHRDEV
+	bool "KHBX character device driver test"
+	help
+	  Kernel module to foo the bar.

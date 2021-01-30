@@ -1,0 +1,4 @@
+config BR2_PACKAGE_FOOBAR_MODULE
+	bool "Foobar dummy test module"
+	help
+	  Kernel module to foo the bar.
