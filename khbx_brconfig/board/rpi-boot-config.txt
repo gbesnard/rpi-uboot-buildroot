@@ -7,3 +7,6 @@ kernel=u-boot.bin
 gpu_mem=100
 
 enable_uart=1
+
+gpio=20=ip,pd
+gpio=21=op,pu,dh
