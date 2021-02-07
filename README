@@ -90,6 +90,10 @@ Check if brcmfmac driver is loaded
 
 	lsmod
 
+Find RPI IP from host (scan local network)
+
+	nmap -sn 192.168.1.0/24
+
 References
 
 	[https://unix.stackexchange.com/questions/396151/buildroot-zero-w-wireless]
@@ -201,6 +205,19 @@ Pinout
 References
 
 	[https://www.raspberrypi-spy.co.uk/2012/06/simple-guide-to-the-rpi-gpio-header-and-pins/]
+
+
+Daemon
+======
+
+An init.d script is used to launch a relay script in background
+
+	/etc/init.d/S84relayd
+	/usr/sbin/relayd
+
+This for now use the CLI interface of libgpiod to open or close the relay
+depending on the time of the day (NTP daemon also used).
+
 
 Serial communication
 ====================

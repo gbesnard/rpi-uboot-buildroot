@@ -1,0 +1,61 @@
+#!/bin/sh
+
+# Start with open relay.
+GPIO_STATE=0
+
+echo "relayd: opening"
+
+# Open relay and keep GPIO state until SIGTERM signal.
+gpioset -m signal gpiochip0 21=${GPIO_STATE} &
+
+# Retrieve gpioset PID (last process launched).
+GPIOSET_PID=$!
+
+while :
+do
+	# Retrieve current hour.
+	CURRENT_HOUR=`date +"%H"`
+
+	# Check if we are between 8am and 17pm.
+	if [ ${CURRENT_HOUR} -ge 8 ] && [ ${CURRENT_HOUR} -lt 17 ]
+	then
+		# We are between 8am and 17pm.
+
+		# Relay should be closed.
+		if [ ${GPIO_STATE} -eq 1 ]
+		then
+			# Relay already closed, nothing to do.
+			:
+		else
+			# Send SIGTERM signal to gpioset to release device access.
+			kill $GPIOSET_PID
+
+			echo "relayd: closing"
+
+			GPIO_STATE=1
+			gpioset -m signal gpiochip0 21=${GPIO_STATE} &
+			GPIOSET_PID=$!
+		fi
+	else
+		# We are NOT between 8am and 17pm.
+
+		# Relay should be opened.
+		if [ ${GPIO_STATE} -eq 0 ]
+		then
+			# Relay already opened, nothing to do.
+			:
+		else
+			# Send SIGTERM signal to gpioset to release device access.
+			kill $GPIOSET_PID
+
+			echo "relayd: opening"
+
+			GPIO_STATE=0
+			gpioset -m signal gpiochip0 21=${GPIO_STATE} &
+			GPIOSET_PID=$!
+		fi
+	fi
+
+	# Wait a minute before rechecking the time.
+	sleep 60
+done
