@@ -77,8 +77,8 @@ and /etc/wpa_supplicant.conf with
 		psk="my_wlan_password"
 	}
 
-the wifi driver must be loaded before the networking init-scripts kick in
-edit /etc/inittab and modprobe brcmfmac ourselves before rs scripts are ran
+The wifi driver must be loaded before the networking init-scripts kicks in.
+Edit /etc/inittab and modprobe brcmfmac ourselves before rs scripts are ran
 
 	# Load Wifi driver
 	::sysinit:/sbin/modprobe brcmfmac 
@@ -147,52 +147,50 @@ References
 
 	[https://buildroot.org/downloads/manual/manual.html#_infrastructure_for_packages_building_kernel_modules]
 
-U-Boot
-======
 
-Build as a standalone (can be build using buildroot)
+Kernel module commands
+======================
 
-	export CROSS_COMPILE=arm-none-eabi-
-	export ARCH=arm
-	make rpi_0_w_defconfig 
-	make -j8 -s
+Load module
 
-In the rpi boot partition, add the file u-boot.bin and change config.txt to 
-load u-boot instead of the Linux kernel
+    modprobe foobar_chrdev.ko
 
-	kernel=u-boot.bin
+Check loaded module
 
-In u-boot prompt load kernel, passe bootargs params and boot at kernel address
-using preloaded device tree. Set the system as read/write.
+    lsmod
 
-	mmc dev 0
-	fatload mmc 0:1 ${kernel_addr_r} zImage
-	setenv earlyprintk bootargs root=/dev/mmcblk0p2 rootfstype=ext4 \
-		rw rootwait console=ttyAMA0,115200
-	printenv
-	md ${fdt_addr}
-	bootz ${kernel_addr_r} - ${fdt_addr}
+Check dmesg for MAJOR_NUMBER
 
-To avoid writing it each time, it is store in boot.scr. This command will 
-create a script to be copied into the SD boot partition
+    dmesg
 
-	mkimage -A arm -O linux -T script -C none -n boot.scr -d boot.scr boot.scr.uimg
+Create a device file
 
-The device tree blob is loaded by the first stage bootloader in fdt_addr.
-This should also be possible to be loaded from the U-Boot stage like this
+    mknod /dev/foobar_chrdev c [MAJOR_NUMBER] 0
 
-	fatload mmc 0:1 ${fdt_addr} bcm2708-rpi-zero-w.dtb
+Change GPIO ouput pin level
+
+    echo [0..1] > /dev/foobar_chrdev
+
+Read GPIO ouput pin level
+
+    cat /dev/foobar_chrdev
+
+Unload module
+
+    modeprobe -r foobar_chrdev
+
+Remove device file
+
+    rm /dev/foobar_chrdev
 	
-but it seems the first stage rpi bootloader does some modification to the dtb 
-before loading it, and a "raw" loaded dtb doesn't seem to work.
-
 References
 
-	[https://elinux.org/RPi_U-Boot]
-	[https://pranavlavhate761157457.wordpress.com/2018/05/14/porting-of-u-boot-on-raspberrypi-3/]
-	[https://www.raspberrypi.org/forums/viewtopic.php?t=276146]
-
-
+	[https://buildroot.org/downloads/manual/manual.html#_infrastructure_for_packages_building_kernel_modules]
+	[https://techfortalk.co.uk/2017/06/15/how-to-addcompile-a-kernel-module-as-a-new-buildroot-package/]
+	[https://www.blaess.fr/christophe/2014/07/22/ajouter-un-module-noyau-personnel-dans-buildroot/]
+	[https://github.com/cpb-/rotation-sensor-module/blob/master/rotation-sensor.c]
+	[https://www.youtube.com/watch?v=Zn8mEZXr6nE&list=WL&index=37]
+	[https://tldp.org/LDP/lkmpg/2.4/html/c577.htm]
 GPIO
 ====
 
@@ -247,10 +245,57 @@ References
 	[https://learn.adafruit.com/adafruits-raspberry-pi-lesson-5-using-a-console-cable/overview]
 
 
+U-Boot
+======
+
+Build as a standalone (can be build using buildroot)
+
+	export CROSS_COMPILE=arm-none-eabi-
+	export ARCH=arm
+	make rpi_0_w_defconfig 
+	make -j8 -s
+
+In the rpi boot partition, add the file u-boot.bin and change config.txt to 
+load u-boot instead of the Linux kernel
+
+	kernel=u-boot.bin
+
+In u-boot prompt load kernel, passe bootargs params and boot at kernel address
+using preloaded device tree. Set the system as read/write.
+
+	mmc dev 0
+	fatload mmc 0:1 ${kernel_addr_r} zImage
+	setenv earlyprintk bootargs root=/dev/mmcblk0p2 rootfstype=ext4 \
+		rw rootwait console=ttyAMA0,115200
+	printenv
+	md ${fdt_addr}
+	bootz ${kernel_addr_r} - ${fdt_addr}
+
+To avoid writing it each time, it is store in boot.scr. This command will 
+create a script to be copied into the SD boot partition
+
+	mkimage -A arm -O linux -T script -C none -n boot.scr -d boot.scr boot.scr.uimg
+
+The device tree blob is loaded by the first stage bootloader in fdt_addr.
+This should also be possible to be loaded from the U-Boot stage like this
+
+	fatload mmc 0:1 ${fdt_addr} bcm2708-rpi-zero-w.dtb
+	
+but it seems the first stage rpi bootloader does some modification to the dtb 
+before loading it, and a "raw" loaded dtb doesn't seem to work.
+
+References
+
+	[https://elinux.org/RPi_U-Boot]
+	[https://pranavlavhate761157457.wordpress.com/2018/05/14/porting-of-u-boot-on-raspberrypi-3/]
+	[https://www.raspberrypi.org/forums/viewtopic.php?t=276146]
+	
+	
 Ideas and improvements
 ======================
 
 - Tweak with device tree to gain understanding.
-- Build a simple character device kernel module.
+- Use simple GPIO driver using Kernel GPIO subsystem API instead of libgpiod
+- Simple GPIO driver using register level access.
 - Try an update mechanism through U-Boot.
 - Try to run a bare-metal application through U-Boot.
